@@ -1,0 +1,165 @@
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ── Input focus styling ── */
+.input-group:focus-within label {
+  color: var(--foreground);
+}
+.input-group:focus-within input,
+.input-group:focus-within textarea {
+  border-color: var(--ring);
+}
+
+/* ── Header blur ── */
+.header-blur {
+  background: hsl(from var(--background) h s l / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Material Symbols sizing ── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ── GitHub-dark preview (always dark regardless of theme) ── */
+.gh-preview {
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.gh-preview h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #21262d;
+  margin-bottom: 1rem;
+}
+
+.gh-preview h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #21262d;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gh-preview h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.gh-preview p {
+  line-height: 1.75;
+  color: #c9d1d9;
+  margin: 0.5rem 0;
+}
+
+.gh-preview a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+.gh-preview a:hover {
+  text-decoration: underline;
+}
+
+.gh-preview ul, .gh-preview ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.gh-preview li {
+  margin: 0.375rem 0;
+  color: #c9d1d9;
+}
+
+.gh-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.gh-preview hr {
+  border-color: #21262d;
+  margin: 2rem 0;
+}
+
+.gh-preview blockquote {
+  border-left: 3px solid #30363d;
+  padding-left: 1rem;
+  color: #8b949e;
+  margin: 0.75rem 0;
+}
+
+.gh-preview table {
+  border-collapse: collapse;
+  width: auto;
+  margin: 0.75rem 0;
+}
+.gh-preview th,
+.gh-preview td {
+  border: 1px solid #30363d;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+.gh-preview th {
+  background: #161b22;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+
+.gh-preview strong {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.gh-preview em {
+  color: #8b949e;
+}
+
+.gh-preview pre {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.gh-preview code {
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8125rem;
+}
+
+/* ── No-scrollbar utility ── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
