@@ -46,8 +46,17 @@ function App() {
   const saveToStorage = useCallback((newData: ReadmeData) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-      setLastSaved(new Date());
+      try {
+        // Strip large base64 images to prevent QuotaExceededError
+        const dataToSave = { ...newData };
+        if (dataToSave.logoUrl?.startsWith('data:image')) dataToSave.logoUrl = '';
+        if (dataToSave.bannerUrl?.startsWith('data:image')) dataToSave.bannerUrl = '';
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+        setLastSaved(new Date());
+      } catch (e) {
+        console.error('Save to storage failed:', e);
+      }
     }, 500);
   }, []);
 

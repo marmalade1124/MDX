@@ -5,6 +5,7 @@ import type { ReadmeData, Badge as BadgeType } from '@/lib/types';
 import { DEFAULT_README_DATA } from '@/lib/types';
 import { TECH_CATEGORIES } from '@/lib/techPresets';
 import { BADGE_PRESETS } from '@/lib/badgePresets';
+import { generateDescription } from '@/lib/ai';
 import { toast } from 'sonner';
 
 interface ReadmeFormProps {
@@ -63,6 +64,15 @@ const BADGE_COLORS: { name: string; hex: string }[] = [
 export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeTechCategory, setActiveTechCategory] = useState(TECH_CATEGORIES[0].id);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+
+  // Load API key on mount if available
+  useState(() => {
+    const savedKey = localStorage.getItem('nvidia_api_key');
+    if (savedKey) setApiKeyInput(savedKey);
+  });
 
   const update = <K extends keyof ReadmeData>(key: K, value: ReadmeData[K]) => {
     onChange({ ...data, [key]: value });
@@ -108,11 +118,48 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
   };
   const removeTech = (i: number) => update('techStack', data.techStack.filter((_, idx) => idx !== i));
 
-  // Reset form
+  const handleGenerateDesc = async () => {
+    let apiKey = localStorage.getItem('nvidia_api_key');
+    if (!apiKey) {
+      toast.error('Please configure your NVIDIA API Key in Settings first.');
+      setShowSettings(true);
+      return;
+    }
+
+    setIsGeneratingDesc(true);
+    const toastId = toast.loading('Generating description with Llama 3.1...');
+    try {
+      const techNames = data.techStack.map(t => t.name);
+      const desc = await generateDescription(data.projectTitle, techNames, apiKey);
+      if (desc) {
+        update('description', desc);
+        toast.success('Description generated!', { id: toastId });
+      } else {
+        throw new Error('Empty response');
+      }
+    } catch (error) {
+      toast.error('Failed to generate description. Check your API key.', { id: toastId });
+      localStorage.removeItem('nvidia_api_key');
+    } finally {
+      setIsGeneratingDesc(false);
+    }
+  };
+
   const handleReset = () => {
     onChange(DEFAULT_README_DATA);
     setSelectedTemplate(null);
     toast('Form cleared');
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      localStorage.setItem('nvidia_api_key', apiKeyInput.trim());
+      toast.success('API Key saved successfully');
+    } else {
+      localStorage.removeItem('nvidia_api_key');
+      toast.success('API Key removed');
+    }
+    setShowSettings(false);
   };
 
   const isTechSelected = (name: string) => data.techStack.some(t => t.name === name);
@@ -128,19 +175,56 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
       <div className="flex-none border-b border-border px-4 py-3 bg-background z-10">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Templates</span>
-          <button
-            onClick={handleReset}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            title="Reset form"
-          >
-            <span className="material-symbols-outlined text-[14px]">refresh</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`text-muted-foreground hover:text-foreground transition-colors ${showSettings ? 'text-primary' : ''}`}
+              title="Settings (API Key)"
+            >
+              <span className="material-symbols-outlined text-[14px]">settings</span>
+            </button>
+            <button
+              onClick={handleReset}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Reset form"
+            >
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+            </button>
+          </div>
         </div>
-        <TemplateSelector
-          onSelect={handleTemplateSelect}
-          selectedId={selectedTemplate}
-          onSelectId={setSelectedTemplate}
-        />
+        
+        {showSettings ? (
+          <div className="mb-4 p-3 bg-secondary/50 rounded border border-border">
+            <label className="block text-[11px] font-mono text-muted-foreground mb-1.5 flex justify-between">
+              <span>NVIDIA API KEY (FOR AI GENERATION)</span>
+              <a href="https://build.nvidia.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">Get Key ↗</a>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                className={inputClass}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="nvapi-..."
+              />
+              <button 
+                onClick={handleSaveApiKey}
+                className="px-3 bg-primary text-primary-foreground font-mono text-xs rounded hover:bg-primary/90 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+              Your key is stored locally in your browser and never sent to our servers. Leaving this blank removes the saved key.
+            </p>
+          </div>
+        ) : (
+          <TemplateSelector
+            onSelect={handleTemplateSelect}
+            selectedId={selectedTemplate}
+            onSelectId={setSelectedTemplate}
+          />
+        )}
       </div>
 
       {/* Scrollable form sections */}
@@ -170,7 +254,20 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
             />
           </div>
           <div className="input-group">
-            <label className="block text-[11px] font-mono text-muted-foreground mb-1.5">DESCRIPTION</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[11px] font-mono text-muted-foreground">DESCRIPTION</label>
+              <button
+                type="button"
+                onClick={handleGenerateDesc}
+                disabled={isGeneratingDesc}
+                className="text-[10px] font-mono text-primary hover:text-primary/80 transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[12px]">
+                  {isGeneratingDesc ? 'hourglass_empty' : 'auto_awesome'}
+                </span>
+                {isGeneratingDesc ? 'GENERATING...' : 'AI GENERATE'}
+              </button>
+            </div>
             <textarea
               className={`${inputClass} min-h-[80px] resize-none leading-relaxed`}
               value={data.description}

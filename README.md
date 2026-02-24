@@ -57,6 +57,8 @@ MDX provides a visual form-based editor with live GitHub-styled preview. Pick a 
 
 - 🎨 **Live GitHub-Styled Preview** — See your README rendered exactly as GitHub displays it
 - 📋 **Smart Templates** — 4 pre-built templates (Minimal, Standard, Detailed, Open Source)
+- 🪄 **AI Description Generation** — Use NVIDIA NIM (Llama 3.1 405B) to automatically generate descriptions based on your title and tech stack
+- 🔐 **Secure API Key Management** — Bring your own NVIDIA API key, securely stored locally in your browser
 - 🛠️ **Tech Stack Quick-Pick** — 50+ technologies across 6 categories, one-click toggle
 - 🏷️ **Badge Presets** — 8 common badge types with instant add
 - 📑 **Auto Table of Contents** — Toggle a clickable TOC that updates dynamically

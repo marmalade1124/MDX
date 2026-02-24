@@ -22,6 +22,7 @@ export function ReadmePreview({ markdown }: ReadmePreviewProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
+        urlTransform={(value: string) => value} // Allow blob: and data: URIs
         components={{
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
@@ -50,8 +51,19 @@ export function ReadmePreview({ markdown }: ReadmePreviewProps) {
           h3({ children }) {
             return <h3 className="text-lg font-semibold text-white mt-4 mb-2">{children}</h3>;
           },
-          p({ children }) {
-            return <p className="text-[#c9d1d9] leading-7">{children}</p>;
+          p({ children, node, ...props }) {
+            // Check if the paragraph has an align attribute from rehype-raw
+            const align = (node?.properties?.align as string) || '';
+            const isCentered = align === 'center' || (props as any).align === 'center';
+            return (
+              <p
+                className={`text-[#c9d1d9] leading-7 ${
+                  isCentered ? 'flex flex-col items-center justify-center text-center w-full' : ''
+                }`}
+              >
+                {children}
+              </p>
+            );
           },
           a({ href, children }) {
             return (
@@ -61,6 +73,7 @@ export function ReadmePreview({ markdown }: ReadmePreviewProps) {
             );
           },
           img({ src, alt }) {
+            if (!src) return null;
             return (
               <img
                 src={src}

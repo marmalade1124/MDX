@@ -15,13 +15,9 @@ export function ImageUploader({ label, value, onChange, hint }: ImageUploaderPro
   const handleFile = useCallback(
     (file: File) => {
       if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          onChange(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      // Use Object URL instead of Base64 to prevent massive string freezing in Code tab
+      const url = URL.createObjectURL(file);
+      onChange(url);
     },
     [onChange]
   );
@@ -108,6 +104,9 @@ export function ImageUploader({ label, value, onChange, hint }: ImageUploaderPro
           <span className="material-symbols-outlined text-[24px] text-muted-foreground/50">cloud_upload</span>
           <p className="text-[11px] font-mono text-muted-foreground">
             Drop image or <span className="text-primary">browse</span>
+          </p>
+          <p className="text-[9px] text-muted-foreground/60 w-3/4 text-center mt-1 leading-tight">
+            Local uploads are temporary for preview purposes. <br/> Use the URL tab for your final GitHub README.
           </p>
           <input
             ref={fileInputRef}

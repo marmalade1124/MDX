@@ -8,7 +8,7 @@ export function generateMarkdown(data: ReadmeData): string {
     sections.push(`<p align="center">\n  <img src="${data.bannerUrl}" alt="${data.projectTitle} Banner" width="100%" />\n</p>\n`);
   }
 
-  // Logo + Title
+  // Logo
   if (data.logoUrl) {
     sections.push(`<p align="center">\n  <img src="${data.logoUrl}" alt="${data.projectTitle} Logo" width="120" />\n</p>\n`);
   }
