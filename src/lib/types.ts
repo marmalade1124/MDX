@@ -1,4 +1,5 @@
 export interface ReadmeData {
+  githubContext?: any;
   projectTitle: string;
   description: string;
   logoUrl: string;
@@ -16,7 +17,16 @@ export interface ReadmeData {
   demoUrl: string;
   repoUrl: string;
   showToc: boolean;
+  aiModel?: string;
 }
+
+export const AVAILABLE_MODELS = [
+  { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B (Default)' },
+  { id: 'meta/llama-3.1-70b-instruct', name: 'Llama 3.1 70B (Faster)' },
+  { id: 'meta/llama-3.1-8b-instruct', name: 'Llama 3.1 8B (Fastest)' },
+  { id: 'mistralai/mistral-large-3-675b-instruct-2512', name: 'Mistral Large 3' },
+  { id: 'nvidia/nemotron-4-340b-instruct', name: 'Nemotron-4 340B' }
+];
 
 export interface Badge {
   type: string;
@@ -40,6 +50,7 @@ export interface Template {
 }
 
 export const DEFAULT_README_DATA: ReadmeData = {
+  githubContext: undefined,
   projectTitle: '',
   description: '',
   logoUrl: '',

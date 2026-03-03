@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { ImageUploader } from './ImageUploader';
 import { TemplateSelector } from './TemplateSelector';
+import { RepositorySelector } from './RepositorySelector';
 import type { ReadmeData, Badge as BadgeType } from '@/lib/types';
-import { DEFAULT_README_DATA } from '@/lib/types';
+import { DEFAULT_README_DATA, AVAILABLE_MODELS } from '@/lib/types';
 import { TECH_CATEGORIES } from '@/lib/techPresets';
 import { BADGE_PRESETS } from '@/lib/badgePresets';
-import { generateDescription } from '@/lib/ai';
+import { generateReadmeData } from '@/lib/ai';
 import { toast } from 'sonner';
+import type { GithubRepo } from '@/lib/github';
+import { getRealGithubToken } from '@/lib/github';
+import { SignedIn, useAuth } from '@clerk/clerk-react';
 
 interface ReadmeFormProps {
   data: ReadmeData;
@@ -62,6 +66,7 @@ const BADGE_COLORS: { name: string; hex: string }[] = [
 ];
 
 export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
+  const { getToken } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeTechCategory, setActiveTechCategory] = useState(TECH_CATEGORIES[0].id);
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
@@ -129,16 +134,44 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
     setIsGeneratingDesc(true);
     const toastId = toast.loading('Generating description with Llama 3.1...');
     try {
+      let githubToken;
+      if (data.githubContext) {
+        const sessionToken = await getToken();
+        if (sessionToken) {
+          try {
+            githubToken = await getRealGithubToken(sessionToken);
+          } catch (e) {
+            console.warn("Could not retrieve GitHub token for context injection", e);
+          }
+        }
+      }
+
       const techNames = data.techStack.map(t => t.name);
-      const desc = await generateDescription(data.projectTitle, techNames, apiKey);
-      if (desc) {
-        update('description', desc);
-        toast.success('Description generated!', { id: toastId });
+      const generatedData = await generateReadmeData(
+        data.projectTitle, 
+        techNames, 
+        apiKey, 
+        data.aiModel || AVAILABLE_MODELS[0].id,
+        data.githubContext, 
+        githubToken
+      );
+      
+      if (generatedData && (generatedData.description || generatedData.features)) {
+        // Update all fields returned by the AI
+        onChange({
+          ...data,
+          description: generatedData.description || data.description,
+          features: generatedData.features || data.features,
+          installation: generatedData.installation || data.installation,
+          usage: generatedData.usage || data.usage,
+          contributing: generatedData.contributing || data.contributing
+        });
+        toast.success('README sections generated!', { id: toastId });
       } else {
-        throw new Error('Empty response');
+        throw new Error('Empty or invalid response');
       }
     } catch (error) {
-      toast.error('Failed to generate description. Check your API key.', { id: toastId });
+      toast.error('Failed to generate README data. Check your API key or model selection.', { id: toastId });
       localStorage.removeItem('nvidia_api_key');
     } finally {
       setIsGeneratingDesc(false);
@@ -160,6 +193,17 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
       toast.success('API Key removed');
     }
     setShowSettings(false);
+  };
+
+  const handleRepoSelect = (repo: GithubRepo) => {
+    onChange({
+      ...data,
+      projectTitle: repo.name,
+      repoUrl: repo.html_url,
+      // We store the full repo object temporarily to use its context in Phase 3
+      githubContext: repo,
+    });
+    toast.success(`Linked ${repo.name}`);
   };
 
   const isTechSelected = (name: string) => data.techStack.some(t => t.name === name);
@@ -199,7 +243,7 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
               <span>NVIDIA API KEY (FOR AI GENERATION)</span>
               <a href="https://build.nvidia.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">Get Key ↗</a>
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-4">
               <input
                 type="password"
                 className={inputClass}
@@ -214,7 +258,26 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
                 Save
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+            
+            <label className="block text-[11px] font-mono text-muted-foreground mb-1.5 flex justify-between">
+              <span>AI MODEL</span>
+              {data.aiModel !== AVAILABLE_MODELS[0].id && (
+                <span className="text-[10px] text-amber-500/80">Custom model selected</span>
+              )}
+            </label>
+            <select
+              className={`${inputClass} appearance-none cursor-pointer`}
+              value={data.aiModel || AVAILABLE_MODELS[0].id}
+              onChange={(e) => update('aiModel', e.target.value)}
+            >
+              {AVAILABLE_MODELS.map(model => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            
+            <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
               Your key is stored locally in your browser and never sent to our servers. Leaving this blank removes the saved key.
             </p>
           </div>
@@ -229,6 +292,12 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
 
       {/* Scrollable form sections */}
       <div className="p-4 space-y-6">
+        
+        {/* GitHub Integration */}
+        <SignedIn>
+          <RepositorySelector onSelect={handleRepoSelect} selectedRepoUrl={data.repoUrl} />
+        </SignedIn>
+
         {/* Project Info */}
         <Section title="Project Information" defaultOpen={true}
           trailing={
@@ -261,11 +330,12 @@ export function ReadmeForm({ data, onChange }: ReadmeFormProps) {
                 onClick={handleGenerateDesc}
                 disabled={isGeneratingDesc}
                 className="text-[10px] font-mono text-primary hover:text-primary/80 transition-colors flex items-center gap-1 disabled:opacity-50"
+                title="Generates Description, Features, Installation, Usage, and Contributing based on your repo"
               >
                 <span className="material-symbols-outlined text-[12px]">
                   {isGeneratingDesc ? 'hourglass_empty' : 'auto_awesome'}
                 </span>
-                {isGeneratingDesc ? 'GENERATING...' : 'AI GENERATE'}
+                {isGeneratingDesc ? 'GENERATING README DATA...' : '✨ AI AUTO-FILL README'}
               </button>
             </div>
             <textarea

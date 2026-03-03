@@ -3,11 +3,13 @@ import { ReadmeForm } from '@/components/ReadmeForm';
 import { ReadmePreview } from '@/components/ReadmePreview';
 import { MarkdownOutput } from '@/components/MarkdownOutput';
 import { generateMarkdown } from '@/lib/generateMarkdown';
+import { SplashScreen } from '@/components/SplashScreen';
 import { DEFAULT_README_DATA } from '@/lib/types';
 import type { ReadmeData } from '@/lib/types';
 import { toast } from 'sonner';
+import { SignedIn, SignedOut, UserButton, useAuth } from '@clerk/clerk-react';
+import { commitReadme, getRealGithubToken } from '@/lib/github';
 import './App.css';
-
 const STORAGE_KEY = 'readme-generator-data';
 const THEME_KEY = 'readme-generator-theme';
 
@@ -32,6 +34,8 @@ function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'editor' | 'preview'>('editor');
+  const [isCommitting, setIsCommitting] = useState(false);
+  const { getToken } = useAuth();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -128,6 +132,44 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [handleCopy, handleDownload]);
 
+  const handleCommit = async () => {
+    if (!data.githubContext) {
+      toast.error('No repository linked. Please select a repository first.');
+      return;
+    }
+
+    setIsCommitting(true);
+    const toastId = toast.loading(`Committing to ${data.githubContext.full_name}...`);
+
+    try {
+      const sessionToken = await getToken();
+      if (!sessionToken) throw new Error('Authentication token missing');
+
+      const token = await getRealGithubToken(sessionToken);
+
+      const commitUrl = await commitReadme(
+        token, 
+        data.githubContext.owner.login, 
+        data.githubContext.name, 
+        markdown
+      );
+      
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <span>Successfully committed README.md!</span>
+          <a href={commitUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+            View on GitHub ↗
+          </a>
+        </div>,
+        { id: toastId, duration: 6000 }
+      );
+    } catch (error: any) {
+      toast.error(`Commit failed: ${error.message}`, { id: toastId });
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
   const handleToggleDarkMode = () => {
     setDarkMode(!darkMode);
     toast(`Switched to ${!darkMode ? 'dark' : 'light'} mode`);
@@ -142,8 +184,14 @@ function App() {
     : 'untitled-project';
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden selection:bg-primary/20 selection:text-primary">
-      {/* Header */}
+    <>
+      <SignedOut>
+        <SplashScreen />
+      </SignedOut>
+
+      <SignedIn>
+        <div className="h-screen flex flex-col overflow-hidden selection:bg-primary/20 selection:text-primary">
+          {/* Header */}
       <header className="flex-none h-12 border-b border-border header-blur px-3 md:px-4 flex items-center justify-between z-50 fixed top-0 w-full">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <div className="flex items-center justify-center w-6 h-6 bg-primary/10 rounded text-primary border border-primary/20 flex-none">
@@ -178,6 +226,15 @@ function App() {
           <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-primary/10 border border-primary/20 text-primary hidden sm:inline">MDX</span>
         </div>
         <div className="flex items-center gap-1 md:gap-2">
+          <div className="mr-2 pt-1 h-[28px] flex items-center justify-center">
+            <UserButton 
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: "w-7 h-7"
+                }
+              }}
+            />
+          </div>
           <button
             onClick={handleToggleDarkMode}
             className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
@@ -198,12 +255,30 @@ function App() {
           </button>
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-foreground text-background text-xs font-medium rounded hover:opacity-90 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1 bg-secondary text-foreground text-xs font-medium rounded hover:bg-secondary/80 transition-colors shadow-sm"
             title="Export as .md (Ctrl+S)"
           >
             <span className="material-symbols-outlined text-[16px]">download</span>
             <span className="hidden sm:inline">Export</span>
           </button>
+          
+          {data.githubContext && (
+            <button
+              onClick={handleCommit}
+              disabled={isCommitting}
+              className={`flex items-center gap-1.5 px-3 py-1 bg-[#2da44e] text-white text-xs font-medium rounded hover:bg-[#2c974b] transition-colors shadow-sm ${isCommitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              title={`Push directly to ${data.githubContext.full_name}`}
+            >
+              {isCommitting ? (
+                 <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+              ) : (
+                <svg height="16" aria-hidden="true" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" className="fill-current">
+                  <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1v-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.21L7 14.472 5.4 15.71a.25.25 0 0 1-.4-.21Z"></path>
+                </svg>
+              )}
+              <span className="hidden sm:inline">{isCommitting ? 'Pushing...' : 'Push to GitHub'}</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -316,6 +391,8 @@ function App() {
         </section>
       </main>
     </div>
+    </SignedIn>
+  </>
   );
 }
 

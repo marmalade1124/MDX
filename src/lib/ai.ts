@@ -1,19 +1,52 @@
-export const AI_MODEL = 'meta/llama-3.1-405b-instruct'; // Upgraded to requested 405B model
+import { fetchRepositoryContext } from './github';
 
-export async function generateDescription(
+export async function generateReadmeData(
   projectName: string,
   techStack: string[],
-  apiKey: string
-): Promise<string> {
-  const prompt = `You are an expert developer. Write a professional, punchy, 2-to-3 sentence GitHub README description for a project.
+  apiKey: string,
+  modelId: string = 'meta/llama-3.1-405b-instruct',
+  githubContext?: any,
+  githubToken?: string
+): Promise<{
+  description: string;
+  features: string[];
+  installation: string;
+  usage: string;
+  contributing: string;
+}> {
+  let promptContext = '';
+  
+  if (githubContext && githubToken) {
+    try {
+      const repoData = await fetchRepositoryContext(
+        githubToken, 
+        githubContext.owner.login, 
+        githubContext.name
+      );
+      if (repoData) {
+        promptContext = `\nRepository Context:\n${repoData}\n`;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch deep repo context for AI prompt', e);
+    }
+  }
+
+  const prompt = `You are an expert developer. Based on the provided context, generate the core content for a GitHub README.md file. 
 
 Project Name: ${projectName || 'Untitled Project'}
-Tech Stack: ${techStack.length > 0 ? techStack.join(', ') : 'Not specified'}
+Tech Stack: ${techStack.length > 0 ? techStack.join(', ') : 'Not specified'}${promptContext}
 
-Do not include any pleasantries, markdown formatting like bolding the project name, or conversational text. Output ONLY the description paragraph.`;
+Return the output strictly as a JSON object matching this exact schema:
+{
+  "description": "A professional, punchy, 2-to-3 sentence description.",
+  "features": ["Feature 1", "Feature 2", "Feature 3"],
+  "installation": "Markdown code block showing installation steps or bash commands.",
+  "usage": "Markdown code block or explanation showing how to use the project.",
+  "contributing": "A short paragraph on how others can contribute."
+}
 
-  // We use a raw fetch call here because the OpenAI SDK sometimes struggles
-  // with browser CORS proxies and adds extra headers that corsproxy.io rejects.
+Do NOT include markdown formatting outside the JSON object. Output ONLY valid JSON.`;
+
   const baseURL = import.meta.env.DEV 
     ? '/nvidia-api' 
     : 'https://corsproxy.io/?url=https://integrate.api.nvidia.com/v1';
@@ -26,10 +59,10 @@ Do not include any pleasantries, markdown formatting like bolding the project na
       'Accept': 'application/json',
     },
     body: JSON.stringify({
-      model: AI_MODEL,
+      model: modelId,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
-      max_tokens: 150,
+      max_tokens: 1500,
     })
   });
 
@@ -40,5 +73,14 @@ Do not include any pleasantries, markdown formatting like bolding the project na
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  const content = data.choices?.[0]?.message?.content?.trim() || '{}';
+  
+  try {
+    // Strip markdown JSON wrappers if the model included them
+    const cleanJson = content.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    return JSON.parse(cleanJson);
+  } catch (e) {
+    console.error('Failed to parse AI JSON response:', content);
+    throw new Error('AI returned malformed JSON');
+  }
 }
