@@ -47,9 +47,9 @@ Return the output strictly as a JSON object matching this exact schema:
 
 Do NOT include markdown formatting outside the JSON object. Output ONLY valid JSON.`;
 
-  const baseURL = import.meta.env.DEV 
-    ? '/nvidia-api' 
-    : 'https://corsproxy.io/?url=https://integrate.api.nvidia.com/v1';
+  // We use Vercel Rewrites in production and Vite proxy in development
+  // to securely route traffic to NVIDIA without hitting CORS errors.
+  const baseURL = '/nvidia-api';
 
   const response = await fetch(`${baseURL}/chat/completions`, {
     method: 'POST',
